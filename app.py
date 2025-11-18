@@ -19,15 +19,20 @@ def load_data():
 df = load_data()
 
 # ---------------------------
-# Sidebar: filtros e user
+# Sidebar: filtros
 # ---------------------------
 st.sidebar.header("Filtros")
 channels = df["channel"].unique()
 campaigns = df["campaign"].unique()
+devices = df["device"].unique()
+utm_sources = df["utm_source"].unique()
+countries = df["channel"].unique() if "country" not in df.columns else df["country"].unique()
 
-selected_channel = st.sidebar.multiselect("Select Channel", channels, default=list(channels))
-selected_campaign = st.sidebar.multiselect("Select Campaign", campaigns, default=list(campaigns))
-date_range = st.sidebar.date_input("Select Date Range", [df["date"].min(), df["date"].max()])
+selected_channel = st.sidebar.multiselect("Channel", channels, default=list(channels))
+selected_campaign = st.sidebar.multiselect("Campaign", campaigns, default=list(campaigns))
+selected_device = st.sidebar.multiselect("Device", devices, default=list(devices))
+selected_utm = st.sidebar.multiselect("UTM Source", utm_sources, default=list(utm_sources))
+date_range = st.sidebar.date_input("Date Range", [df["date"].min(), df["date"].max()])
 
 uid_input = st.sidebar.text_input("User Explorer: user_id")
 
@@ -35,21 +40,23 @@ uid_input = st.sidebar.text_input("User Explorer: user_id")
 filtered_df = df[
     (df["channel"].isin(selected_channel)) &
     (df["campaign"].isin(selected_campaign)) &
+    (df["device"].isin(selected_device)) &
+    (df["utm_source"].isin(selected_utm)) &
     (df["date"].between(pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])))
 ]
 
 # ---------------------------
 # Tabs
 # ---------------------------
-tab_overview, tab_journey, tab_user, tab_debug, tab_marketing = st.tabs(
-    ["Overview", "User Journey", "User Detail", "Tracking Debugger", "Marketing Performance"]
+tab_overview, tab_funnel, tab_journey, tab_user, tab_debug, tab_marketing = st.tabs(
+    ["Overview", "Funnel", "User Journey", "User Detail", "Tracking Debugger", "Marketing Performance"]
 )
 
 # ---------------------------
 # Tab: Overview
 # ---------------------------
 with tab_overview:
-    st.subheader("Overview — KPIs")
+    st.subheader("KPIs")
     col1, col2, col3, col4, col5 = st.columns(5)
 
     unique_users = filtered_df["user_id"].nunique()
@@ -60,7 +67,6 @@ with tab_overview:
     cpl = (cost / leads) if leads>0 else np.nan
     roas = (revenue / cost) if cost>0 else np.nan
 
-    # KPIs com cores
     col1.metric("Unique Users", f"{unique_users:,}")
     col2.metric("Sessions", f"{sessions_count:,}")
     col3.metric("Leads", f"{leads:,}")
@@ -72,17 +78,32 @@ with tab_overview:
     fig = px.line(daily, x="date", y=["revenue","sessions"], labels={"value":"Count","date":"Date"})
     st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("### Sessions per Channel")
+    st.markdown("### Sessions & Revenue by Channel")
     channel_summary = filtered_df.groupby("channel").agg(sessions=("session_id","nunique"), revenue=("revenue","sum")).reset_index()
     fig2 = px.bar(channel_summary, x="channel", y=["sessions","revenue"], barmode="group")
     st.plotly_chart(fig2, use_container_width=True)
 
 # ---------------------------
+# Tab: Funnel
+# ---------------------------
+with tab_funnel:
+    st.subheader("Funnel — multi-step conversion")
+    funnel_steps = ["Homepage","Product","Cart","Checkout","purchase"]
+    funnel_counts = []
+    for step in funnel_steps:
+        users_in_step = filtered_df[filtered_df["page"]==step]["user_id"].nunique() if step!="purchase" else filtered_df[filtered_df["event"]=="purchase"]["user_id"].nunique()
+        funnel_counts.append(users_in_step)
+
+    funnel_df = pd.DataFrame({"Step": funnel_steps, "Users": funnel_counts})
+    funnel_df["Conversion"] = funnel_df["Users"] / funnel_df["Users"].iloc[0] * 100
+    fig_funnel = px.funnel(funnel_df, x="Users", y="Step", text="Conversion")
+    st.plotly_chart(fig_funnel, use_container_width=True)
+
+# ---------------------------
 # Tab: User Journey
 # ---------------------------
 with tab_journey:
-    st.subheader("User Journey — Sankey & Routes")
-    # Agrupar páginas pequenas
+    st.subheader("User Journey — Sankey & Top Routes")
     page_counts = filtered_df["page"].value_counts()
     small_pages = page_counts[page_counts<3].index.tolist()
     filtered_df["page_group"] = filtered_df["page"].apply(lambda x: "Other" if x in small_pages else x)
@@ -116,7 +137,6 @@ with tab_journey:
     sankey.update_layout(height=500)
     st.plotly_chart(sankey, use_container_width=True)
 
-    st.markdown("### Top Routes")
     routes = filtered_df.groupby("user_id").apply(lambda g: " → ".join(g.sort_values("date")["page_group"].tolist())).reset_index(name="route")
     top_routes = routes["route"].value_counts().reset_index(name="count")
     st.dataframe(top_routes.head(20))
@@ -137,6 +157,7 @@ with tab_user:
     else:
         st.write(user_df[["date","page","event","campaign","utm_source","device","revenue"]])
         timeline_df = user_df.copy()
+        timeline_df["hour"] = timeline_df["date"].dt.hour
         timeline_df["start"] = timeline_df["date"]
         timeline_df["end"] = timeline_df["date"] + pd.to_timedelta(1, unit="h")
         fig = px.timeline(timeline_df, x_start="start", x_end="end", y="event", color="page", title=f"Timeline for {uid}")
@@ -150,30 +171,4 @@ with tab_user:
 # ---------------------------
 with tab_debug:
     st.subheader("Tracking Debugger")
-    missing_utm = filtered_df[filtered_df["utm_source"].isna() | (filtered_df["utm_source"]=="")]
-    st.write("Events missing UTM/source:", len(missing_utm))
-    st.dataframe(missing_utm.head(50))
-
-    sessions_no_purchase = filtered_df.groupby("session_id").filter(lambda x: not (x["event"]=="purchase").any())
-    st.write("Sessions without purchase (sample):", sessions_no_purchase["session_id"].nunique())
-    st.dataframe(sessions_no_purchase.head(50))
-
-# ---------------------------
-# Tab: Marketing Performance
-# ---------------------------
-with tab_marketing:
-    st.subheader("Marketing Performance")
-    camp_summary = filtered_df.groupby("campaign").agg(
-        clicks=("clicks","sum"),
-        cost=("cost","sum"),
-        conversions=("conversions","sum"),
-        revenue=("revenue","sum")
-    ).reset_index()
-    if not camp_summary.empty:
-        camp_summary["CPL"] = camp_summary["cost"] / camp_summary["conversions"].replace(0,np.nan)
-        camp_summary["ROAS"] = camp_summary["revenue"] / camp_summary["cost"].replace(0,np.nan)
-        st.dataframe(camp_summary)
-        fig = px.bar(camp_summary, x="campaign", y=["cost","conversions","revenue"], barmode="group")
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No campaigns data available.")
+    missing_utm = filtered
