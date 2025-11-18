@@ -1,0 +1,4 @@
+order_id,date,client,city,product,quantity,price
+1001,2025-01-10,John Doe,Toronto,Mosaico Azul 25x25,4,125.00
+1002,2025-01-11,Amy Smith,Montreal,Mosaico Branco 25x25,9,140.00
+1003,2025-01-12,Derek Lee,Vancouver,Mosaico Travertino 25x25,12,160.00
