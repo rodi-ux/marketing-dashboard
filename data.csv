@@ -1,4 +1,22 @@
-order_id,date,client,city,product,quantity,price
-1001,2025-01-10,John Doe,Toronto,Mosaico Azul 25x25,4,125.00
-1002,2025-01-11,Amy Smith,Montreal,Mosaico Branco 25x25,9,140.00
-1003,2025-01-12,Derek Lee,Vancouver,Mosaico Travertino 25x25,12,160.00
+date,channel,campaign,device,session_id,user_id,page,event,utm_source,utm_medium,utm_campaign,cost,impressions,clicks,conversions,revenue
+2025-01-01,Google Ads,Search Tiles,Mobile,s1,u1,Homepage,pageview,google,cpc,search_tiles,2.50,1200,45,1,320
+2025-01-01,Google Ads,Search Tiles,Mobile,s1,u1,Product,pageview,google,cpc,search_tiles,2.50,1200,45,1,320
+2025-01-01,Google Ads,Search Tiles,Mobile,s1,u1,Cart,pageview,google,cpc,search_tiles,2.50,1200,45,1,320
+2025-01-01,Google Ads,Search Tiles,Mobile,s1,u1,Checkout,purchase,google,cpc,search_tiles,2.50,1200,45,1,320
+
+2025-01-01,Meta Ads,Cold Audience,Desktop,s2,u2,Homepage,pageview,facebook,paid,cold_aud,1.10,800,30,0,0
+2025-01-01,Meta Ads,Cold Audience,Desktop,s2,u2,Product,pageview,facebook,paid,cold_aud,1.10,800,30,0,0
+2025-01-02,Meta Ads,Remarketing,Mobile,s3,u3,Homepage,pageview,facebook,paid,remarketing,0.90,600,25,1,290
+2025-01-02,Meta Ads,Remarketing,Mobile,s3,u3,Product,pageview,facebook,paid,remarketing,0.90,600,25,1,290
+2025-01-02,Meta Ads,Remarketing,Mobile,s3,u3,Checkout,purchase,facebook,paid,remarketing,0.90,600,25,1,290
+
+2025-01-03,LinkedIn,Architects Campaign,Desktop,s4,u4,Homepage,pageview,linkedin,cpc,arch_campaign,4.10,500,10,0,0
+2025-01-03,LinkedIn,Architects Campaign,Desktop,s4,u4,Product,pageview,linkedin,cpc,arch_campaign,4.10,500,10,0,0
+
+2025-01-04,Email,Newsletter Jan,Mobile,s5,u5,Homepage,pageview,email,email,newsletter_jan,0,0,0,1,450
+2025-01-04,Email,Newsletter Jan,Mobile,s5,u5,Product,pageview,email,email,newsletter_jan,0,0,0,1,450
+2025-01-04,Email,Newsletter Jan,Mobile,s5,u5,Checkout,purchase,email,email,newsletter_jan,0,0,0,1,450
+
+2025-01-05,Organic,SEO Pool Tiles,Desktop,s6,u6,Homepage,pageview,google,organic,seo_tiles,0,0,0,1,220
+2025-01-05,Organic,SEO Pool Tiles,Desktop,s6,u6,Product,pageview,google,organic,seo_tiles,0,0,0,1,220
+2025-01-05,Organic,SEO Pool Tiles,Desktop,s6,u6,Checkout,purchase,google,organic,seo_tiles,0,0,0,1,220
