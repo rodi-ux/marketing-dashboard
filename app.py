@@ -12,26 +12,35 @@ st.title("📊 Marketing Dashboard – Mosaicos no Canadá")
 # ---------------------------
 @st.cache_data
 def load_data():
-    url = "https://raw.githubusercontent.com/rodi-ux/marketing-dashboard/main/data.csv"
-    df = pd.read_csv(url, parse_dates=["date"])
-    return df
+    ga4_url = "https://raw.githubusercontent.com/rodi-ux/marketing-dashboard/main/ga4_data.csv"
+    stape_url = "https://raw.githubusercontent.com/rodi-ux/marketing-dashboard/main/stape_data.csv"
+    ads_url = "https://raw.githubusercontent.com/rodi-ux/marketing-dashboard/main/google_ads_data.csv"
 
-df = load_data()
+    ga4_df = pd.read_csv(ga4_url, parse_dates=["date"])
+    stape_df = pd.read_csv(stape_url, parse_dates=["date"])
+    ads_df = pd.read_csv(ads_url, parse_dates=["date"])
+
+    # Merge GA4 + Stape by user_id and session_id if needed
+    df = pd.merge(ga4_df, stape_df, how="outer", on=["user_id","session_id","date"], suffixes=("_ga4","_stape"))
+    return df, ads_df
+
+df, ads_df = load_data()
 
 # ---------------------------
 # Sidebar: filtros
 # ---------------------------
 st.sidebar.header("Filtros")
-channels = df["channel"].unique()
-campaigns = df["campaign"].unique()
-devices = df["device"].unique()
-utm_sources = df["utm_source"].unique()
-countries = df["channel"].unique() if "country" not in df.columns else df["country"].unique()
+channels = df["channel"].dropna().unique()
+campaigns = df["campaign"].dropna().unique()
+devices = df["device"].dropna().unique()
+utm_sources = df["utm_source"].dropna().unique()
+countries = df["country"].dropna().unique() if "country" in df.columns else []
 
 selected_channel = st.sidebar.multiselect("Channel", channels, default=list(channels))
 selected_campaign = st.sidebar.multiselect("Campaign", campaigns, default=list(campaigns))
 selected_device = st.sidebar.multiselect("Device", devices, default=list(devices))
 selected_utm = st.sidebar.multiselect("UTM Source", utm_sources, default=list(utm_sources))
+selected_country = st.sidebar.multiselect("Country", countries, default=list(countries))
 date_range = st.sidebar.date_input("Date Range", [df["date"].min(), df["date"].max()])
 
 uid_input = st.sidebar.text_input("User Explorer: user_id")
@@ -42,6 +51,7 @@ filtered_df = df[
     (df["campaign"].isin(selected_campaign)) &
     (df["device"].isin(selected_device)) &
     (df["utm_source"].isin(selected_utm)) &
+    ((df["country"].isin(selected_country)) if len(selected_country)>0 else True) &
     (df["date"].between(pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])))
 ]
 
@@ -63,7 +73,7 @@ with tab_overview:
     sessions_count = filtered_df["session_id"].nunique()
     leads = filtered_df[filtered_df["event"].isin(["form_submit","purchase"])]["user_id"].nunique()
     revenue = filtered_df["revenue"].sum()
-    cost = filtered_df["cost"].sum()
+    cost = filtered_df["cost"].sum() if "cost" in filtered_df.columns else 0
     cpl = (cost / leads) if leads>0 else np.nan
     roas = (revenue / cost) if cost>0 else np.nan
 
@@ -157,7 +167,6 @@ with tab_user:
     else:
         st.write(user_df[["date","page","event","campaign","utm_source","device","revenue"]])
         timeline_df = user_df.copy()
-        timeline_df["hour"] = timeline_df["date"].dt.hour
         timeline_df["start"] = timeline_df["date"]
         timeline_df["end"] = timeline_df["date"] + pd.to_timedelta(1, unit="h")
         fig = px.timeline(timeline_df, x_start="start", x_end="end", y="event", color="page", title=f"Timeline for {uid}")
@@ -171,4 +180,27 @@ with tab_user:
 # ---------------------------
 with tab_debug:
     st.subheader("Tracking Debugger")
-    missing_utm = filtered
+    missing_utm = filtered_df[filtered_df["utm_source"].isna() | filtered_df["utm_medium"].isna()]
+    st.write(f"Events missing UTM info: {len(missing_utm)}")
+    st.dataframe(missing_utm)
+
+# ---------------------------
+# Tab: Marketing Performance
+# ---------------------------
+with tab_marketing:
+    st.subheader("Marketing Performance")
+
+    ads_summary = ads_df.groupby("campaign").agg(
+        clicks=("clicks","sum"),
+        impressions=("impressions","sum"),
+        cost=("cost","sum"),
+        conversions=("conversions","sum")
+    ).reset_index()
+
+    ads_summary["CPC"] = ads_summary["cost"] / ads_summary["clicks"]
+    ads_summary["CTR"] = ads_summary["clicks"] / ads_summary["impressions"] * 100
+    ads_summary["ROAS"] = revenue / ads_summary["cost"]
+
+    st.dataframe(ads_summary)
+    fig_ads = px.bar(ads_summary, x="campaign", y=["clicks","conversions"], barmode="group")
+    st.plotly_chart(fig_ads, use_container_width=True)
